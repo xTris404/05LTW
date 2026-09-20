@@ -1,24 +1,15 @@
-# GraphQL Product & Category – Yêu cầu 1
+# GraphQL Product & Category – Full (Yêu cầu 1 + 2 + 3)
 
 **Commit message đề xuất:**  
-`feat: Home page - products sorted by price ASC`
+`feat: CRUD + search + pagination for Product and Category`
 
 ## Yêu cầu đã hoàn thành
 
-✅ Hiển thị **tất cả product có price từ thấp đến cao** trên trang Home  
-✅ Sử dụng **GraphQL** (`productsByPriceAsc`)  
-✅ Render bằng **AJAX** trên **Thymeleaf**
+✅ **Yêu cầu 1**: Products sorted by price ASC trên Home  
+✅ **Yêu cầu 2**: Products theo 1 category trên Home  
+✅ **Yêu cầu 3**: CRUD + tìm kiếm + phân trang cho **Product** và **Category**
 
-## Cấu trúc chính
-
-| File | Vai trò |
-|------|---------|
-| `schema.graphqls` | Query `productsByPriceAsc` |
-| `ProductRepository` | `findAllByOrderByPriceAsc()` |
-| `ProductService` | Gọi repository |
-| `ProductGraphQLController` | `@QueryMapping` |
-| `home.html` | AJAX gọi GraphQL và hiển thị |
-| `DemoApplication` | Seed data mẫu |
+Tất cả dùng **GraphQL + AJAX + Thymeleaf**.
 
 ## Cách chạy
 
@@ -28,33 +19,24 @@ mvn spring-boot:run
 
 ### Link kiểm tra
 
-| Mục đích | Link |
-|----------|------|
-| **Trang Home (Yêu cầu 1)** | http://localhost:8080/home |
+| Trang | Link |
+|-------|------|
+| Home (YC1 + YC2) | http://localhost:8080/home |
+| Product CRUD | http://localhost:8080/products |
+| Category CRUD | http://localhost:8080/categories |
 | GraphiQL | http://localhost:8080/graphiql |
 | H2 Console | http://localhost:8080/h2-console |
 
-### Test nhanh trên GraphiQL
+## GraphQL chính
 
 ```graphql
-query {
-  productsByPriceAsc {
-    id
-    title
-    price
-    category { name }
-  }
-}
+# Query
+productsByPriceAsc
+productsByCategory(categoryId)
+products(page, size, keyword)
+categoriesPage(page, size, keyword)
+
+# Mutation
+createProduct / updateProduct / deleteProduct
+createCategory / updateCategory / deleteCategory
 ```
-
-Kết quả sẽ trả về danh sách product đã sắp xếp theo `price` tăng dần.
-
-## Dữ liệu mẫu (seed)
-
-- 3 Category: Laptop, Smartphone, Gia dụng
-- 7 Product với giá từ 199 → 1899
-
-## Chưa có (sẽ làm ở các phần sau)
-
-- Lấy product theo 1 category
-- CRUD + search + pagination Product / Category

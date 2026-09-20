@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Category Management</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        nav a { margin-right: 15px; text-decoration: none; color: #007bff; font-weight: bold; }
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #f0f0f0; }
+        .pagination button { margin: 2px; padding: 5px 10px; cursor: pointer; }
+        .pagination button:disabled { background: #007bff; color: white; }
+        #formArea { border: 1px solid #ddd; padding: 15px; margin-top: 20px; background: #fafafa; max-width: 400px; }
+        #formArea input { width: 100%; margin: 5px 0; padding: 6px; box-sizing: border-box; }
+        button { cursor: pointer; padding: 6px 12px; margin: 2px; }
+    </style>
+</head>
+<body>
+<nav>
+    <a href="/home">Home</a>
+    <a href="/products">Products CRUD</a>
+    <a href="/categories">Categories CRUD</a>
+    <a href="/graphiql" target="_blank">GraphiQL</a>
+</nav>
+<hr>
+<h1>Category CRUD + Search + Pagination</h1>
+
+<input type="text" id="keyword" placeholder="Search by name...">
+<button onclick="loadCategories(0)">Search</button>
+<button onclick="showCreateForm()">+ New Category</button>
+
+<table>
+    <thead>
+    <tr><th>ID</th><th>Name</th><th>Description</th><th>Actions</th></tr>
+    </thead>
+    <tbody id="categoryTable"></tbody>
+</table>
+<div class="pagination" id="pagination"></div>
+
+<div id="formArea" style="display:none;">
+    <h3 id="formTitle">Create Category</h3>
+    <input type="hidden" id="categoryId">
+    <label>Name</label><input id="name" placeholder="Name">
+    <label>Description</label><input id="description" placeholder="Description">
+    <br><br>
+    <button onclick="saveCategory()">Save</button>
+    <button onclick="$('#formArea').hide()">Cancel</button>
+</div>
+
+<script>
+const GRAPHQL = "/graphql";
+let currentPage = 0;
+const pageSize = 5;
+
+function gql(query, variables = {}) {
+    return $.ajax({
+        url: GRAPHQL, method: "POST", contentType: "application/json",
+        data: JSON.stringify({ query, variables })
+    });
+}
+
+function loadCategories(page = 0) {
+    currentPage = page;
+    const keyword = $("#keyword").val() || null;
+    gql(`
+        query($page: Int, $size: Int, $keyword: String) {
+            categoriesPage(page: $page, size: $size, keyword: $keyword) {
+                content { id name description }
+                pageInfo { totalPages number totalElements }
+            }
+        }
+    `, { page, size: pageSize, keyword }).done(res => {
+        if (res.errors) { alert(JSON.stringify(res.errors)); return; }
+        const data = res.data.categoriesPage;
+        let rows = "";
+        data.content.forEach(c => {
+            rows += `<tr>
+                <td>${c.id}</td><td>${c.name}</td><td>${c.description || ''}</td>
+                <td>
+                    <button onclick="editCategory(${c.id})">Edit</button>
+                    <button onclick="deleteCategory(${c.id})">Delete</button>
+                </td>
+            </tr>`;
+        });
+        $("#categoryTable").html(rows || "<tr><td colspan='4'>No data</td></tr>");
+        let pag = "";
+        for (let i = 0; i < data.pageInfo.totalPages; i++) {
+            pag += `<button onclick="loadCategories(${i})" ${i === data.pageInfo.number ? 'disabled' : ''}>${i + 1}</button>`;
+        }
+        $("#pagination").html(pag);
+    });
+}
+
+function showCreateForm() {
+    $("#formTitle").text("Create Category");
+    $("#categoryId").val("");
+    $("#name, #description").val("");
+    $("#formArea").show();
+}
+
+function editCategory(id) {
+    gql(`query($id: ID!) { categoryById(id: $id) { id name description } }`, { id })
+    .done(res => {
+        if (res.errors || !res.data.categoryById) { alert("Category not found"); return; }
+        const c = res.data.categoryById;
+        $("#formTitle").text("Update Category");
+        $("#categoryId").val(c.id);
+        $("#name").val(c.name);
+        $("#description").val(c.description || "");
+        $("#formArea").show();
+    });
+}
+
+function saveCategory() {
+    const id = $("#categoryId").val();
+    const input = { name: $("#name").val(), description: $("#description").val() };
+    if (!input.name) { alert("Name is required"); return; }
+    const mutation = id
+        ? `mutation($id: ID!, $input: CategoryInput!) { updateCategory(id: $id, input: $input) { id } }`
+        : `mutation($input: CategoryInput!) { createCategory(input: $input) { id } }`;
+    const variables = id ? { id, input } : { input };
+    gql(mutation, variables).done(res => {
+        if (res.errors) { alert(JSON.stringify(res.errors)); return; }
+        $("#formArea").hide();
+        loadCategories(currentPage);
+    });
+}
+
+function deleteCategory(id) {
+    if (!confirm("Delete this category?")) return;
+    gql(`mutation($id: ID!) { deleteCategory(id: $id) }`, { id }).done(res => {
+        if (res.errors) { alert(JSON.stringify(res.errors)); return; }
+        loadCategories(currentPage);
+    });
+}
+
+$(() => loadCategories(0));
+</script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Product Management</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        nav a { margin-right: 15px; text-decoration: none; color: #007bff; font-weight: bold; }
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #f0f0f0; }
+        .pagination button { margin: 2px; padding: 5px 10px; cursor: pointer; }
+        .pagination button:disabled { background: #007bff; color: white; }
+        #formArea { border: 1px solid #ddd; padding: 15px; margin-top: 20px; background: #fafafa; max-width: 400px; }
+        #formArea input, #formArea select { width: 100%; margin: 5px 0; padding: 6px; box-sizing: border-box; }
+        button { cursor: pointer; padding: 6px 12px; margin: 2px; }
+    </style>
+</head>
+<body>
+<nav>
+    <a href="/home">Home</a>
+    <a href="/products">Products CRUD</a>
+    <a href="/categories">Categories CRUD</a>
+    <a href="/graphiql" target="_blank">GraphiQL</a>
+</nav>
+<hr>
+<h1>Product CRUD + Search + Pagination</h1>
+
+<input type="text" id="keyword" placeholder="Search by title or description...">
+<button onclick="loadProducts(0)">Search</button>
+<button onclick="showCreateForm()">+ New Product</button>
+
+<table>
+    <thead>
+    <tr><th>ID</th><th>Title</th><th>Price</th><th>Amount</th><th>Category</th><th>Actions</th></tr>
+    </thead>
+    <tbody id="productTable"></tbody>
+</table>
+<div class="pagination" id="pagination"></div>
+
+<div id="formArea" style="display:none;">
+    <h3 id="formTitle">Create Product</h3>
+    <input type="hidden" id="productId">
+    <label>Title</label><input id="title" placeholder="Title">
+    <label>Description</label><input id="description" placeholder="Description">
+    <label>Images</label><input id="images" placeholder="Images">
+    <label>Price</label><input id="price" type="number" step="0.01" placeholder="Price">
+    <label>Amount</label><input id="amount" type="number" placeholder="Amount">
+    <label>Category</label><select id="categoryId"></select>
+    <br><br>
+    <button onclick="saveProduct()">Save</button>
+    <button onclick="$('#formArea').hide()">Cancel</button>
+</div>
+
+<script>
+const GRAPHQL = "/graphql";
+let currentPage = 0;
+const pageSize = 5;
+
+function gql(query, variables = {}) {
+    return $.ajax({
+        url: GRAPHQL, method: "POST", contentType: "application/json",
+        data: JSON.stringify({ query, variables })
+    });
+}
+
+function loadProducts(page = 0) {
+    currentPage = page;
+    const keyword = $("#keyword").val() || null;
+    gql(`
+        query($page: Int, $size: Int, $keyword: String) {
+            products(page: $page, size: $size, keyword: $keyword) {
+                content { id title price amount images category { id name } }
+                pageInfo { totalPages number totalElements }
+            }
+        }
+    `, { page, size: pageSize, keyword }).done(res => {
+        if (res.errors) { alert(JSON.stringify(res.errors)); return; }
+        const data = res.data.products;
+        let rows = "";
+        data.content.forEach(p => {
+            rows += `<tr>
+                <td>${p.id}</td><td>${p.title}</td><td>${p.price}</td><td>${p.amount || 0}</td>
+                <td>${p.category ? p.category.name : ''}</td>
+                <td>
+                    <button onclick="editProduct(${p.id})">Edit</button>
+                    <button onclick="deleteProduct(${p.id})">Delete</button>
+                </td>
+            </tr>`;
+        });
+        $("#productTable").html(rows || "<tr><td colspan='6'>No data</td></tr>");
+        let pag = "";
+        for (let i = 0; i < data.pageInfo.totalPages; i++) {
+            pag += `<button onclick="loadProducts(${i})" ${i === data.pageInfo.number ? 'disabled' : ''}>${i + 1}</button>`;
+        }
+        $("#pagination").html(pag);
+    });
+}
+
+function loadCategories() {
+    return gql(`query { categories { id name } }`).done(res => {
+        let opts = "";
+        if (res.data && res.data.categories) {
+            res.data.categories.forEach(c => { opts += `<option value="${c.id}">${c.name}</option>`; });
+        }
+        $("#categoryId").html(opts);
+    });
+}
+
+function showCreateForm() {
+    $("#formTitle").text("Create Product");
+    $("#productId").val("");
+    $("#title, #description, #images, #price, #amount").val("");
+    $("#formArea").show();
+    loadCategories();
+}
+
+function editProduct(id) {
+    gql(`query($id: ID!) { productById(id: $id) { id title description images price amount category { id } } }`, { id })
+    .done(res => {
+        if (res.errors || !res.data.productById) { alert("Product not found"); return; }
+        const p = res.data.productById;
+        $("#formTitle").text("Update Product");
+        $("#productId").val(p.id);
+        $("#title").val(p.title);
+        $("#description").val(p.description || "");
+        $("#images").val(p.images || "");
+        $("#price").val(p.price);
+        $("#amount").val(p.amount || 0);
+        loadCategories().done(() => { if (p.category) $("#categoryId").val(p.category.id); });
+        $("#formArea").show();
+    });
+}
+
+function saveProduct() {
+    const id = $("#productId").val();
+    const input = {
+        title: $("#title").val(),
+        description: $("#description").val(),
+        images: $("#images").val(),
+        price: parseFloat($("#price").val()),
+        amount: parseInt($("#amount").val()) || 0,
+        categoryId: $("#categoryId").val()
+    };
+    if (!input.title || isNaN(input.price) || !input.categoryId) {
+        alert("Please fill Title, Price and Category"); return;
+    }
+    const mutation = id
+        ? `mutation($id: ID!, $input: ProductInput!) { updateProduct(id: $id, input: $input) { id } }`
+        : `mutation($input: ProductInput!) { createProduct(input: $input) { id } }`;
+    const variables = id ? { id, input } : { input };
+    gql(mutation, variables).done(res => {
+        if (res.errors) { alert(JSON.stringify(res.errors)); return; }
+        $("#formArea").hide();
+        loadProducts(currentPage);
+    });
+}
+
+function deleteProduct(id) {
+    if (!confirm("Delete this product?")) return;
+    gql(`mutation($id: ID!) { deleteProduct(id: $id) }`, { id }).done(res => {
+        if (res.errors) { alert(JSON.stringify(res.errors)); return; }
+        loadProducts(currentPage);
+    });
+}
+
+$(() => loadProducts(0));
+</script>
+</body>
+</html>

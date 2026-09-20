@@ -2,89 +2,100 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>Home - Products by Price ASC</title>
+    <title>Home - Products</title>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        h1 { color: #333; }
+        nav { margin-bottom: 20px; }
+        nav a { margin-right: 15px; text-decoration: none; color: #007bff; font-weight: bold; }
+        nav a:hover { text-decoration: underline; }
+        h1, h2 { color: #333; }
         .card {
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 14px 18px;
-            margin: 10px 0;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            background: white; border: 1px solid #ddd; border-radius: 8px;
+            padding: 14px 18px; margin: 10px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
         .price { color: #e74c3c; font-weight: bold; font-size: 1.1em; }
         .meta { color: #666; font-size: 0.9em; margin-top: 4px; }
-        #loading { color: #888; }
+        select { padding: 8px 12px; font-size: 1em; min-width: 220px; border-radius: 6px; border: 1px solid #ccc; }
+        section { margin-bottom: 40px; }
+        code { background: #eee; padding: 2px 6px; border-radius: 4px; }
     </style>
 </head>
 <body>
-    <h1>Products sorted by price (low → high)</h1>
-    <p>Dữ liệu lấy từ GraphQL query <code>productsByPriceAsc</code> qua AJAX</p>
+<nav>
+    <a href="/home">Home</a>
+    <a href="/products">Products CRUD</a>
+    <a href="/categories">Categories CRUD</a>
+    <a href="/graphiql" target="_blank">GraphiQL</a>
+</nav>
+<hr>
 
-    <div id="products-by-price">
-        <p id="loading">Đang tải...</p>
-    </div>
+<h1>Home - GraphQL + AJAX</h1>
+
+<section>
+    <h2>1. Products sorted by price (low → high)</h2>
+    <p>Query: <code>productsByPriceAsc</code></p>
+    <div id="products-by-price"><p>Đang tải...</p></div>
+</section>
+
+<section>
+    <h2>2. Products by Category</h2>
+    <p>Query: <code>productsByCategory(categoryId)</code></p>
+    <label>Chọn Category: </label>
+    <select id="categorySelect">
+        <option value="">-- Chọn category --</option>
+    </select>
+    <div id="products-by-category" style="margin-top: 15px;"></div>
+</section>
 
 <script>
 const GRAPHQL = "/graphql";
-
 function gql(query, variables = {}) {
     return $.ajax({
-        url: GRAPHQL,
-        method: "POST",
-        contentType: "application/json",
+        url: GRAPHQL, method: "POST", contentType: "application/json",
         data: JSON.stringify({ query, variables })
     });
 }
-
-// Yêu cầu 1: Lấy tất cả product sắp xếp theo price tăng dần
-gql(`
-    query {
-        productsByPriceAsc {
-            id
-            title
-            description
-            images
-            price
-            amount
-            category {
-                name
-            }
-        }
-    }
-`).done(function(res) {
-    if (res.errors) {
-        $("#products-by-price").html("<p style='color:red'>Lỗi: " + JSON.stringify(res.errors) + "</p>");
-        return;
-    }
-
-    const products = res.data.productsByPriceAsc;
+function renderProducts(products, containerId) {
     if (!products || products.length === 0) {
-        $("#products-by-price").html("<p>Không có sản phẩm nào</p>");
+        $(containerId).html("<p>Không có sản phẩm nào</p>");
         return;
     }
-
     let html = "";
     products.forEach(function(p, index) {
-        html += `
-            <div class="card">
-                <strong>${index + 1}. ${p.title}</strong>
-                <span class="price"> — $${p.price}</span>
-                <div class="meta">
-                    Category: ${p.category ? p.category.name : 'N/A'} |
-                    Amount: ${p.amount || 0} |
-                    ${p.images || ''}
-                </div>
-                <div class="meta">${p.description || ''}</div>
-            </div>
-        `;
+        html += `<div class="card">
+            <strong>${index + 1}. ${p.title}</strong>
+            <span class="price"> — $${p.price}</span>
+            <div class="meta">Category: ${p.category ? p.category.name : 'N/A'} | Amount: ${p.amount || 0}</div>
+            <div class="meta">${p.description || ''}</div>
+        </div>`;
     });
-    $("#products-by-price").html(html);
-}).fail(function() {
-    $("#products-by-price").html("<p style='color:red'>Không kết nối được GraphQL endpoint</p>");
+    $(containerId).html(html);
+}
+
+gql(`query { productsByPriceAsc { id title description images price amount category { name } } }`)
+.done(function(res) {
+    if (res.errors) { $("#products-by-price").html("<p style='color:red'>" + JSON.stringify(res.errors) + "</p>"); return; }
+    renderProducts(res.data.productsByPriceAsc, "#products-by-price");
+}).fail(function() { $("#products-by-price").html("<p style='color:red'>Lỗi kết nối GraphQL</p>"); });
+
+gql(`query { categories { id name } }`).done(function(res) {
+    if (res.data && res.data.categories) {
+        res.data.categories.forEach(function(c) {
+            $("#categorySelect").append(`<option value="${c.id}">${c.name}</option>`);
+        });
+    }
+});
+
+$("#categorySelect").on("change", function() {
+    const catId = $(this).val();
+    if (!catId) { $("#products-by-category").empty(); return; }
+    $("#products-by-category").html("<p>Đang tải...</p>");
+    gql(`query($id: ID!) { productsByCategory(categoryId: $id) { id title description images price amount category { name } } }`, { id: catId })
+    .done(function(res) {
+        if (res.errors) { $("#products-by-category").html("<p style='color:red'>" + JSON.stringify(res.errors) + "</p>"); return; }
+        renderProducts(res.data.productsByCategory, "#products-by-category");
+    }).fail(function() { $("#products-by-category").html("<p style='color:red'>Lỗi kết nối GraphQL</p>"); });
 });
 </script>
 </body>
