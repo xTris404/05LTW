@@ -3,6 +3,10 @@ package com.example.demo.repository;
 import com.example.demo.entity.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
+
 public interface ProductRepository extends JpaRepository<Product, Long> {
-    // Sẽ bổ sung các method (findAllByOrderByPriceAsc, findByCategoryId, search...) ở các phần sau
+
+    // Sắp xếp theo price tăng dần
+    List<Product> findAllByOrderByPriceAsc();
 }

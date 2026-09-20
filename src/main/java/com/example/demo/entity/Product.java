@@ -37,7 +37,6 @@ public class Product {
         this.category = category;
     }
 
-    // Getters & Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

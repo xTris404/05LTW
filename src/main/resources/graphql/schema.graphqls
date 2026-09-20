@@ -1,4 +1,3 @@
-# ===== Types =====
 type Category {
     id: ID!
     name: String!
@@ -16,7 +15,7 @@ type Product {
     category: Category
 }
 
-# ===== Placeholder Query (sẽ bổ sung ở các phần sau) =====
 type Query {
-    _placeholder: String
+    # Yêu cầu 1: tất cả product sắp xếp theo price tăng dần
+    productsByPriceAsc: [Product!]!
 }
