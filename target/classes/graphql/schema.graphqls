@@ -1,0 +1,22 @@
+# ===== Types =====
+type Category {
+    id: ID!
+    name: String!
+    description: String
+    products: [Product!]!
+}
+
+type Product {
+    id: ID!
+    title: String!
+    description: String
+    images: String
+    price: Float!
+    amount: Int
+    category: Category
+}
+
+# ===== Placeholder Query (sẽ bổ sung ở các phần sau) =====
+type Query {
+    _placeholder: String
+}
