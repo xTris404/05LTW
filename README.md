@@ -1,8 +1,4 @@
 # GraphQL Product & Category – Full (Yêu cầu 1 + 2 + 3)
-
-**Commit message đề xuất:**  
-`feat: CRUD + search + pagination for Product and Category`
-
 ## Yêu cầu đã hoàn thành
 
 ✅ **Yêu cầu 1**: Products sorted by price ASC trên Home  
